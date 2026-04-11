@@ -46,7 +46,8 @@ readme = "README.md"
     documentation = "https://github.com/swar/nba_api/blob/master/README.md"
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+# 1.x remains valid for PEP 517 builds; 2.x is preferred on newer pip/Python.
+requires = ["poetry-core>=1.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
