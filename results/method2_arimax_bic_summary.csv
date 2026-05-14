@@ -1,0 +1,6 @@
+,value
+n_strata,90
+bic_full_mean,677.253919680305
+bic_reduced_mean,664.9003036815676
+bic_delta_mean,12.35361599873748
+bic_full_better_frac,0.022222222222222223

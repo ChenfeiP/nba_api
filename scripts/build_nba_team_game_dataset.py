@@ -111,21 +111,41 @@ def prior_mean_last_n_by_mask(
     return out
 
 
+def add_efg_pct(df: pd.DataFrame) -> pd.DataFrame:
+    """Effective FG% per team-game: (FGM + 0.5 * FG3M) / FGA."""
+    df = df.copy()
+    req = {"FGM", "FGA", "FG3M"}
+    missing = req - set(df.columns)
+    if missing:
+        return df
+    fga = df["FGA"].astype(float)
+    df["EFG_PCT"] = (df["FGM"].astype(float) + 0.5 * df["FG3M"].astype(float)) / fga.where(
+        fga > 0
+    )
+    return df
+
+
 def add_rest_and_b2b(df: pd.DataFrame) -> pd.DataFrame:
-    """Add days_rest, is_back_to_back, and opponent rest (reset across seasons)."""
+    """Add days_rest, back-to-back, short-rest (0–1 days), and opponent counterparts."""
     df = df.copy()
     df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"])
     df.sort_values(["TEAM_ID", "SEASON_ID", "GAME_DATE", "GAME_ID"], inplace=True)
     gaps = df.groupby(["TEAM_ID", "SEASON_ID"], sort=False)["GAME_DATE"].diff().dt.days
     # days between games: gap - 1; first game of season -> NaN
     df["days_rest"] = gaps - 1
-    df["is_back_to_back"] = (df["days_rest"] == 0).astype(int)
+    df["is_back_to_back"] = ((df["days_rest"] == 0) & df["days_rest"].notna()).astype(int)
+    df["is_short_rest"] = ((df["days_rest"] <= 1) & df["days_rest"].notna()).astype(int)
 
     opp_rest = df[["GAME_ID", "TEAM_ID", "days_rest"]].rename(
         columns={"TEAM_ID": "OPPONENT_ID", "days_rest": "opp_days_rest"}
     )
     df = df.merge(opp_rest, on=["GAME_ID", "OPPONENT_ID"], how="left")
-    df["opp_is_back_to_back"] = (df["opp_days_rest"] == 0).astype(int)
+    df["opp_is_back_to_back"] = (
+        ((df["opp_days_rest"] == 0) & df["opp_days_rest"].notna()).astype(int)
+    )
+    df["opp_is_short_rest"] = (
+        ((df["opp_days_rest"] <= 1) & df["opp_days_rest"].notna()).astype(int)
+    )
     return df
 
 
@@ -166,6 +186,7 @@ def build_team_features(
         "point_diff",
         "FG_PCT",
         "FG3_PCT",
+        "EFG_PCT",
         "FT_PCT",
         "REB",
         "AST",
@@ -173,6 +194,7 @@ def build_team_features(
         "STL",
         "BLK",
     ]
+    metric_cols = [c for c in metric_cols if c in df.columns]
 
     out_frames: list[pd.DataFrame] = []
     for _, g in df.groupby(["TEAM_ID", "SEASON_ID"], sort=False):
@@ -278,6 +300,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Rows: {len(raw)}", file=sys.stderr)
 
     raw = attach_opponent(raw)
+    raw = add_efg_pct(raw)
     raw = add_rest_and_b2b(raw)
     panel = build_team_features(raw, rolling_window=args.rolling_window)
 
@@ -298,8 +321,10 @@ def main(argv: list[str] | None = None) -> int:
     ctx_cols = [
         "days_rest",
         "is_back_to_back",
+        "is_short_rest",
         "opp_days_rest",
         "opp_is_back_to_back",
+        "opp_is_short_rest",
     ]
     rest_cols = [c for c in panel.columns if c not in id_cols + ctx_cols]
     rest_cols.sort()

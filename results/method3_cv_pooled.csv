@@ -1,0 +1,6 @@
+,value
+folds_concatenated_rmse_full,15.545703647422409
+folds_concatenated_rmse_reduced,15.61339251176855
+folds_concatenated_mae_full,12.307048421025657
+folds_concatenated_mae_reduced,12.384687580208764
+n_test_rows_total,4860.0
